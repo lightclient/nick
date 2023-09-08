@@ -19,7 +19,6 @@ import (
 )
 
 func main() {
-
 	go func() {
 		logTime := time.Now()
 		for {
