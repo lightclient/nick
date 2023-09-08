@@ -65,8 +65,7 @@ func brute(target []byte) {
 		if score > highscore.Load() {
 			highscore.Store(score)
 			txjson, _ := json.MarshalIndent(tx, "", "  ")
-			fmt.Printf("New highscore: %d\nAddress: %v\nTx:\n%v\n", score,
-				addr, string(txjson))
+			fmt.Printf("New highscore: %d\nSender: %v\nAddress: %v\nTx:\n%v\n", score, sender, addr, string(txjson))
 		}
 		crand.Read(u64)
 		inner.S = new(big.Int).SetUint64(binary.BigEndian.Uint64(u64))
