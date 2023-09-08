@@ -22,7 +22,7 @@ func main() {
 	go func() {
 		logTime := time.Now()
 		for {
-			if time.Since(logTime) > time.Second*5 {
+			if time.Since(logTime) > time.Second*30 {
 				fmt.Printf("Did %d attempts in %v, best score is %d\n", count.Load(), time.Since(logTime), highscore.Load())
 				logTime = time.Now()
 			}
