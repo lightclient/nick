@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
 	"runtime"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -28,7 +30,13 @@ func main() {
 			}
 		}
 	}()
-	for i := 0; i < runtime.NumCPU()-1; i++ {
+	threads := runtime.NumCPU()
+	if len(os.Args) == 2 {
+		val, _ := strconv.ParseInt(os.Args[1], 10, 64)
+		threads = int(val)
+	}
+	fmt.Println("thread count:", threads)
+	for i := 0; i < threads-1; i++ {
 		go brute(common.FromHex("0xbeac02000000000000000000"))
 	}
 	brute(common.FromHex("0xbeac02000000000000000000"))
