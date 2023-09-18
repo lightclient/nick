@@ -53,7 +53,7 @@ func brute(target []byte) {
 			Gas:      250000,
 			To:       nil,
 			Value:    big.NewInt(0),
-			Data:     common.FromHex("0x60618060095f395ff33373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762016da0810690815414603c575f5ffd5b62016da001545f5260205ff35b5f5ffd5b62016da042064281555f359062016da0015500"),
+			Data:     common.FromHex("0x60618060095f395ff33373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
 			V:        big.NewInt(27),
 			R:        big.NewInt(0x539),
 			S:        big.NewInt(0x1337),
