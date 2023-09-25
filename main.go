@@ -4,6 +4,8 @@ package main
 
 import (
 	"bytes"
+	crand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -40,15 +42,15 @@ func main() {
 	}
 	fmt.Println("thread count:", threads)
 	for i := 0; i < threads; i++ {
-		go brute(i, threads, common.FromHex("0000000000"), common.FromHex("0xbeac02"))
+		go brute(common.FromHex("0000000000"), common.FromHex("0xbeac02"))
 	}
-	brute(threads, threads, common.FromHex("0000000000"), common.FromHex("0xbeac02"))
+	brute(common.FromHex("0000000000"), common.FromHex("0xbeac02"))
 }
 
 var highscore atomic.Int64
 var count atomic.Uint64
 
-func brute(idx, threads int, start []byte, end []byte) {
+func brute(start []byte, end []byte) {
 	var (
 		inner = types.LegacyTx{
 			Nonce:    0,
@@ -59,11 +61,11 @@ func brute(idx, threads int, start []byte, end []byte) {
 			Data:     common.FromHex("0x60618060095f395ff33373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
 			V:        big.NewInt(27),
 			R:        big.NewInt(0x539),
-			S:        big.NewInt(0x1337 + int64(idx)),
+			S:        big.NewInt(0x1337),
 		}
-		tx   = types.NewTx(&inner)
-		step = big.NewInt(int64(threads))
-		hash = sighash(types.NewTx(&inner))
+		hash      = sighash(types.NewTx(&inner))
+		bigbig, _ = new(big.Int).SetString("0x1337000000000000000000", 0)
+		u64       = make([]byte, 8)
 	)
 	for {
 		sender, err := recoverPlain(hash, inner.R, inner.S, inner.V)
@@ -78,13 +80,16 @@ func brute(idx, threads int, start []byte, end []byte) {
 			if int64(score) > highscore.Load() {
 				highscore.Store(int64(score))
 			}
-			if score >= 9 {
+			if score >= 5 {
+				tx := types.NewTx(&inner)
 				txjson, _ := json.MarshalIndent(tx, "", "  ")
 				fmt.Printf("New highscore: %d\nSender: %v\nAddress: %v\nTx:\n%v\n", score, sender, addr, string(txjson))
 			}
 		}
 
-		inner.S.Add(inner.S, step)
+		crand.Read(u64)
+		inner.S = new(big.Int).SetUint64(binary.BigEndian.Uint64(u64))
+		inner.S.Add(inner.S, bigbig)
 		count.Add(1)
 	}
 }
