@@ -80,7 +80,7 @@ func brute(start []byte, end []byte) {
 			if int64(score) > highscore.Load() {
 				highscore.Store(int64(score))
 			}
-			if score >= 5 {
+			if score >= 8 {
 				tx := types.NewTx(&inner)
 				txjson, _ := json.MarshalIndent(tx, "", "  ")
 				fmt.Printf("New highscore: %d\nSender: %v\nAddress: %v\nTx:\n%v\n", score, sender, addr, string(txjson))
