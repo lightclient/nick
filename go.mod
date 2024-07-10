@@ -1,4 +1,4 @@
-module github.com/lightclient/nicks-method
+module github.com/lightclient/nick
 
 go 1.20
 
