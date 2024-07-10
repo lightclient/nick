@@ -69,6 +69,8 @@ var (
 	}
 
 	app = &cli.Command{
+		Name:  "nick",
+		Usage: "a vanity address searcher for deployments using nick's method",
 		Commands: []*cli.Command{
 			{
 				Name:  "search",
