@@ -68,6 +68,21 @@ var (
 		Value: 1000,
 	}
 
+	sigRFlag = &cli.StringFlag{
+		Name:        "sig-r",
+		Usage:       "R value of the transaction signature",
+		Value:       "0x0539",
+		DefaultText: "0x0539",
+		Validator:   checkHex,
+	}
+	sigSFlag = &cli.StringFlag{
+		Name:        "sig-s",
+		Usage:       "S value of the transaction signature",
+		Value:       "0x1337",
+		DefaultText: "0x1337",
+		Validator:   checkHex,
+	}
+
 	app = &cli.Command{
 		Name:  "nick",
 		Usage: "a vanity address searcher for deployments using nick's method",
@@ -76,12 +91,14 @@ var (
 				Name:  "search",
 				Usage: "Search for a vanity address to deploy a contract using nicks method.",
 				Flags: []cli.Flag{threadsFlag, scoreFlag, prefixFlag, suffixFlag,
-					initcodeFlag, gasLimitFlag, gasPriceFlag},
+					initcodeFlag, gasLimitFlag, gasPriceFlag, sigRFlag},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					f := task{
 						prefix:    common.FromHex(cmd.String(prefixFlag.Name)),
 						suffix:    common.FromHex(cmd.String(suffixFlag.Name)),
 						initcode:  common.FromHex(cmd.String(initcodeFlag.Name)),
+						sigR:      new(big.Int).SetBytes(common.FromHex(cmd.String(sigRFlag.Name))),
+						sigS:      big.NewInt(0x1337),
 						gasLimit:  cmd.Uint(gasLimitFlag.Name),
 						gasPrice:  cmd.Uint(gasPriceFlag.Name),
 						threads:   cmd.Int(threadsFlag.Name),
@@ -91,6 +108,21 @@ var (
 						quit:      make(chan struct{}),
 					}
 					return f.run()
+				},
+			},
+			{
+				Name:  "build",
+				Usage: "Build a json tx object and prints the deployment info.",
+				Flags: []cli.Flag{initcodeFlag, gasLimitFlag, gasPriceFlag, sigRFlag, sigSFlag},
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					f := task{
+						initcode: common.FromHex(cmd.String(initcodeFlag.Name)),
+						sigR:     new(big.Int).SetBytes(common.FromHex(cmd.String(sigRFlag.Name))),
+						sigS:     new(big.Int).SetBytes(common.FromHex(cmd.String(sigSFlag.Name))),
+						gasLimit: cmd.Uint(gasLimitFlag.Name),
+						gasPrice: cmd.Uint(gasPriceFlag.Name),
+					}
+					return f.buildTx()
 				},
 			},
 			{
@@ -114,6 +146,9 @@ type task struct {
 	prefix   []byte
 	suffix   []byte
 	initcode []byte
+
+	sigR *big.Int
+	sigS *big.Int
 
 	gasLimit uint64
 	gasPrice uint64
@@ -158,8 +193,8 @@ func (t *task) brute() {
 			Value:    big.NewInt(0),
 			Data:     t.initcode,
 			V:        big.NewInt(27),
-			R:        big.NewInt(0x539),
-			S:        big.NewInt(0x1337),
+			R:        big.NewInt(0).Set(t.sigR),
+			S:        big.NewInt(0).Set(t.sigS),
 		}
 		hash = sighash(types.NewTx(&inner))
 		u64  = make([]byte, 8)
@@ -186,6 +221,54 @@ func (t *task) brute() {
 		inner.S = new(big.Int).SetUint64(binary.BigEndian.Uint64(u64))
 		t.count.Add(1)
 	}
+}
+
+// buildTx builds a transaction and prints the deployment info.
+func (t *task) buildTx() error {
+	var (
+		inner = types.LegacyTx{
+			Nonce:    0,
+			GasPrice: newGwei(t.gasPrice),
+			Gas:      t.gasLimit,
+			To:       nil,
+			Value:    big.NewInt(0),
+			Data:     t.initcode,
+			V:        big.NewInt(27),
+			R:        big.NewInt(0).Set(t.sigR),
+			S:        big.NewInt(0).Set(t.sigS),
+		}
+		tx   = types.NewTx(&inner)
+		hash = sighash(tx)
+	)
+
+	txJson, err := tx.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("failed to marshal json tx: %w", err)
+	}
+
+	txRaw, err := tx.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to marshal raw tx: %w", err)
+	}
+
+	sender, err := recoverPlain(hash, inner.R, inner.S, inner.V)
+	if err != nil {
+		panic(err)
+	}
+	addr := crypto.CreateAddress(sender, 0)
+
+	fmt.Printf("Transaction Details\n")
+	fmt.Printf("\n")
+	fmt.Printf("TX: %v\n", string(txJson))
+	fmt.Printf("RawTX: 0x%x\n", txRaw)
+	fmt.Printf("\n")
+	fmt.Printf("Sig Hash: %v\n", hash.String())
+	fmt.Printf("TX Hash: %v\n", tx.Hash())
+	fmt.Printf("\n")
+	fmt.Printf("Sender: %v\n", sender.String())
+	fmt.Printf("Address: %v\n", addr.String())
+
+	return nil
 }
 
 // print recomputes the deployer and deployment address from a tx json and
@@ -256,6 +339,8 @@ func recoverPlain(sighash common.Hash, R, S, Vb *big.Int) (common.Address, error
 	copy(sig[32-len(r):32], r)
 	copy(sig[64-len(s):64], s)
 	sig[64] = V
+
+	//fmt.Printf("sig: 0x%x\n", sig)
 
 	// recover the public key from the signature
 	pub, err := crypto.Ecrecover(sighash[:], sig)
