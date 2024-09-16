@@ -345,7 +345,7 @@ func recoverPlain(sighash common.Hash, R, S, Vb *big.Int) (common.Address, error
 	copy(sig[64-len(s):64], s)
 	sig[64] = V
 
-	fmt.Printf("sig: 0x%x\n", sig)
+	//fmt.Printf("sig: 0x%x\n", sig)
 
 	// recover the public key from the signature
 	pub, err := crypto.Ecrecover(sighash[:], sig)
