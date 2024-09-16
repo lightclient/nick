@@ -1,4 +1,4 @@
-module github.com/pk910/nick
+module github.com/lightclient/nick
 
 go 1.21
 
