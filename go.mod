@@ -1,4 +1,4 @@
-module github.com/lightclient/nick
+module github.com/pk910/nick
 
 go 1.21
 
@@ -18,7 +18,6 @@ require (
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
-	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/holiman/uint256 v1.3.1 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
