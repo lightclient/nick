@@ -91,14 +91,14 @@ var (
 				Name:  "search",
 				Usage: "Search for a vanity address to deploy a contract using nicks method.",
 				Flags: []cli.Flag{threadsFlag, scoreFlag, prefixFlag, suffixFlag,
-					initcodeFlag, gasLimitFlag, gasPriceFlag, sigRFlag, sigSFlag},
+					initcodeFlag, gasLimitFlag, gasPriceFlag, sigRFlag},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					f := task{
 						prefix:    common.FromHex(cmd.String(prefixFlag.Name)),
 						suffix:    common.FromHex(cmd.String(suffixFlag.Name)),
 						initcode:  common.FromHex(cmd.String(initcodeFlag.Name)),
 						sigR:      new(big.Int).SetBytes(common.FromHex(cmd.String(sigRFlag.Name))),
-						sigS:      new(big.Int).SetBytes(common.FromHex(cmd.String(sigSFlag.Name))),
+						sigS:      big.NewInt(0x1337),
 						gasLimit:  cmd.Uint(gasLimitFlag.Name),
 						gasPrice:  cmd.Uint(gasPriceFlag.Name),
 						threads:   cmd.Int(threadsFlag.Name),

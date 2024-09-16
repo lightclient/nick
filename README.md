@@ -26,6 +26,25 @@ OPTIONS:
    --initcode value  desired initcode to deploy at vanity address (default: "0x")
    --gaslimit value  desired gas limit for deployment transaction (default: 250000)
    --gasprice value  desired gas price (gwei) for deployment transaction (default: 1000)
+   --sig-r value     R value of the transaction signature (default: 0x0539)
+   --help, -h        show help (default: false)
+```
+
+### Get transaction details for given signature
+
+```
+NAME:
+   nick build - Build a json tx object and prints the deployment info.
+
+USAGE:
+   nick build [command [command options]] 
+
+OPTIONS:
+   --initcode value  desired initcode to deploy at vanity address (default: "0x")
+   --gaslimit value  desired gas limit for deployment transaction (default: 250000)
+   --gasprice value  desired gas price (gwei) for deployment transaction (default: 1000)
+   --sig-r value     R value of the transaction signature (default: 0x0539)
+   --sig-s value     S value of the transaction signature (default: 0x1337)
    --help, -h        show help (default: false)
 ```
 
