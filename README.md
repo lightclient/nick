@@ -23,13 +23,9 @@ send it from any account to perform the deployment.
 
 ## Usage
 
+The following CLI flags can be used with `search` and `create2`.
+
 ```
-NAME:
-   nick search - Search for a vanity address to deploy a contract using nicks method.
-
-USAGE:
-   nick search [command [command options]]
-
 OPTIONS:
    --threads value   number of threads to search on (default: 10)
    --score value     minimum score number to report (default: 5)
