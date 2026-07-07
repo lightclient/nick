@@ -78,19 +78,18 @@ var (
 				Flags: []cli.Flag{threadsFlag, scoreFlag, prefixFlag, suffixFlag,
 					initcodeFlag, gasLimitFlag, gasPriceFlag},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					f := task{
-						prefix:    common.FromHex(cmd.String(prefixFlag.Name)),
-						suffix:    common.FromHex(cmd.String(suffixFlag.Name)),
-						initcode:  common.FromHex(cmd.String(initcodeFlag.Name)),
-						gasLimit:  cmd.Uint(gasLimitFlag.Name),
-						gasPrice:  cmd.Uint(gasPriceFlag.Name),
-						threads:   cmd.Int(threadsFlag.Name),
-						score:     int(cmd.Int(scoreFlag.Name)),
-						highscore: &atomic.Uint64{},
-						count:     &atomic.Uint64{},
-						quit:      make(chan struct{}),
-					}
-					return f.run()
+					f := newTask(cmd)
+					return f.run(f.brute)
+				},
+			},
+			{
+				Name:  "create2",
+				Usage: "Search for a CREATE2 salt giving a vanity address when deploying through Arachnid's deployment proxy.",
+				Flags: []cli.Flag{threadsFlag, scoreFlag, prefixFlag, suffixFlag,
+					initcodeFlag, gasLimitFlag, gasPriceFlag},
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					f := newTask(cmd)
+					return f.run(f.bruteCreate2)
 				},
 			},
 			{
@@ -102,6 +101,26 @@ var (
 		},
 	}
 )
+
+// create2Factory is Arachnid's CREATE2 deployment proxy, deployed at the same
+// address on mainnet and most other chains.
+// See https://github.com/Arachnid/deterministic-deployment-proxy.
+var create2Factory = common.HexToAddress("0x4e59b44847b379578588920cA78FbF26c0B4956C")
+
+func newTask(cmd *cli.Command) *task {
+	return &task{
+		prefix:    common.FromHex(cmd.String(prefixFlag.Name)),
+		suffix:    common.FromHex(cmd.String(suffixFlag.Name)),
+		initcode:  common.FromHex(cmd.String(initcodeFlag.Name)),
+		gasLimit:  cmd.Uint(gasLimitFlag.Name),
+		gasPrice:  cmd.Uint(gasPriceFlag.Name),
+		threads:   cmd.Int(threadsFlag.Name),
+		score:     int(cmd.Int(scoreFlag.Name)),
+		highscore: &atomic.Uint64{},
+		count:     &atomic.Uint64{},
+		quit:      make(chan struct{}),
+	}
+}
 
 func main() {
 	if err := app.Run(context.Background(), os.Args); err != nil {
@@ -126,7 +145,7 @@ type task struct {
 	quit      chan struct{}
 }
 
-func (f *task) run() error {
+func (f *task) run(brute func()) error {
 	go func() {
 		logTime := time.Now()
 		for {
@@ -140,7 +159,7 @@ func (f *task) run() error {
 
 	// Spin up workers.
 	for i := 0; i < int(f.threads); i++ {
-		go f.brute()
+		go brute()
 	}
 
 	<-f.quit
@@ -188,6 +207,76 @@ func (t *task) brute() {
 	}
 }
 
+// bruteCreate2 runs the brute force salt searcher on a single thread. It
+// searches for a salt value such that a deployment of the initcode through
+// the CREATE2 factory lands on a vanity address.
+func (t *task) bruteCreate2() {
+	var (
+		hasher = sha3.NewLegacyKeccak256().(crypto.KeccakState)
+		buf    = create2Preimage(create2Factory, crypto.Keccak256Hash(t.initcode))
+		salt   = buf[21:53]
+		hash   common.Hash
+	)
+	// Start each thread at a random salt to avoid overlapping search ranges.
+	crand.Read(salt)
+
+	for {
+		hasher.Reset()
+		hasher.Write(buf[:])
+		hasher.Read(hash[:])
+		addr := hash[12:]
+
+		if bytes.Equal(addr[len(addr)-len(t.suffix):], t.suffix) {
+			score := compare(t.prefix, addr) + len(t.suffix)*2
+			if uint64(score) > t.highscore.Load() {
+				t.highscore.Store(uint64(score))
+			}
+			if score >= t.score {
+				t.reportCreate2(score, salt, common.BytesToAddress(addr))
+			}
+		}
+		// Increment the salt.
+		for i := len(salt) - 1; i >= 0; i-- {
+			salt[i]++
+			if salt[i] != 0 {
+				break
+			}
+		}
+		t.count.Add(1)
+	}
+}
+
+// create2Preimage assembles the CREATE2 address preimage
+// 0xff ++ deployer ++ salt ++ initcodeHash with a zero salt.
+func create2Preimage(deployer common.Address, initcodeHash common.Hash) [85]byte {
+	var buf [85]byte
+	buf[0] = 0xff
+	copy(buf[1:21], deployer[:])
+	copy(buf[53:85], initcodeHash[:])
+	return buf
+}
+
+// reportCreate2 prints a found salt along with the unsigned deployment
+// transaction against the CREATE2 factory.
+func (t *task) reportCreate2(score int, salt []byte, addr common.Address) {
+	// The factory expects the salt followed by the initcode as calldata.
+	data := make([]byte, 0, 32+len(t.initcode))
+	data = append(data, salt...)
+	data = append(data, t.initcode...)
+	to := create2Factory
+	tx := types.NewTx(&types.LegacyTx{
+		Nonce:    0,
+		GasPrice: newGwei(t.gasPrice),
+		Gas:      t.gasLimit,
+		To:       &to,
+		Value:    big.NewInt(0),
+		Data:     data,
+	})
+	txjson, _ := json.MarshalIndent(tx, "", "  ")
+	fmt.Printf("New highscore: %d\nSalt: %v\nAddress: %v\nTx (unsigned):\n%v\n",
+		score, hexutil.Encode(salt), addr, string(txjson))
+}
+
 // print recomputes the deployer and deployment address from a tx json and
 // prints the result.
 func print(ctx context.Context, cmd *cli.Command) error {
@@ -198,6 +287,16 @@ func print(ctx context.Context, cmd *cli.Command) error {
 	var tx types.Transaction
 	if err := tx.UnmarshalJSON(b); err != nil {
 		return fmt.Errorf("unable to parse tx: %w", err)
+	}
+	if to := tx.To(); to != nil && *to == create2Factory {
+		data := tx.Data()
+		if len(data) < 32 {
+			return fmt.Errorf("tx data too short for a create2 deployment: %d bytes", len(data))
+		}
+		salt := common.BytesToHash(data[:32])
+		addr := crypto.CreateAddress2(create2Factory, salt, crypto.Keccak256(data[32:]))
+		fmt.Printf("Factory: %v\nSalt: %v\nAddress: %v\n", create2Factory, salt, addr)
+		return nil
 	}
 	signer := types.LatestSignerForChainID(common.Big1)
 	sender, err := signer.Sender(&tx)

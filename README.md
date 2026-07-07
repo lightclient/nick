@@ -1,6 +1,7 @@
 # `nick`
 
-`nick` is a vanity address searcher for deployments using [Nick's method][nm].
+`nick` is a vanity address searcher for deployments using [Nick's method][nm]
+or [Nick's other method][ddp] (CREATE2 proxy).
 
 ## Quick Start
 
@@ -9,15 +10,22 @@ go install github.com/lightclient/nick@latest
 nick search --initcode="0x60425000"
 ```
 
-## Usage
+To search for a CREATE2 salt instead, for deployment through the
+deterministic deployment proxy at `0x4e59b44847b379578588920cA78FbF26c0B4956C`:
 
 ```
-NAME:
-   nick search - Search for a vanity address to deploy a contract using nicks method.
+nick create2 --initcode="0x60425000"
+```
 
-USAGE:
-   nick search [command [command options]]
+This prints the salt and an unsigned legacy transaction against the proxy.
+The transaction data is the 32-byte salt followed by the initcode; sign and
+send it from any account to perform the deployment.
 
+## Usage
+
+The following CLI flags can be used with `search` and `create2`.
+
+```
 OPTIONS:
    --threads value   number of threads to search on (default: 10)
    --score value     minimum score number to report (default: 5)
@@ -30,3 +38,4 @@ OPTIONS:
 ```
 
 [nm]: https://yamenmerhi.medium.com/nicks-method-ethereum-keyless-execution-168a6659479c
+[ddp]: https://github.com/Arachnid/deterministic-deployment-proxy
