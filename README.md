@@ -1,7 +1,7 @@
 # `nick`
 
 `nick` is a vanity address searcher for deployments using [Nick's method][nm]
-or the [deterministic deployment proxy][ddp] (CREATE2).
+or [Nick's other method][ddp] (CREATE2 proxy).
 
 ## Quick Start
 
